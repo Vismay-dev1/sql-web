@@ -18,6 +18,10 @@ MemoryVault is a web application that simulates a relational database system dir
 ## How It Works
 The application mimics database operations using browser-based storage, allowing users to store and retrieve structured data without needing a backend database like MySQL.
 
+## Live Website
+
+https://vismay-dev1.github.io/sql-web/
+
 ## Future Improvements
 - Query system (SQL-like interface)
 - Data export/import

@@ -1,0 +1,1982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="VISMAY DBMS">
+<meta name="mobile-web-app-capable" content="yes">
+<title>VISMAY DBMS</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+:root {
+  --bg0:#080c10; --bg2:#161b22; --bg3:#1c2128;
+  --b1:#30363d; --b2:#444c56;
+  --t1:#e6edf3; --t2:#8b949e; --t3:#484f58;
+  --green:#3fb950; --cyan:#58d8ff; --yellow:#e3b341;
+  --red:#f85149; --orange:#e8812d; --purple:#d2a8ff;
+
+  /* iOS safe areas */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+html {
+  height: 100%;
+  /* Prevent iOS bounce scroll */
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+}
+
+body {
+  background: var(--bg0);
+  color: var(--t1);
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  /* iOS keyboard avoidance */
+  padding-top: var(--sat);
+  padding-left: var(--sal);
+  padding-right: var(--sar);
+  -webkit-text-size-adjust: 100%;
+}
+
+/* ── TOP BAR ── */
+.topbar {
+  background: var(--bg3);
+  border-bottom: 1px solid var(--b1);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 8px;
+  flex-shrink: 0;
+  height: 48px; /* taller for touch */
+  user-select: none;
+}
+.dots { display:flex; gap:5px; }
+.dot  { width:10px; height:10px; border-radius:50%; }
+.dot.r{background:#ff5f57;} .dot.y{background:#ffbd2e;} .dot.g{background:#28c840;}
+.brand { display:flex; align-items:baseline; gap:4px; }
+.brand-name { color:var(--orange); font-weight:700; font-size:15px; letter-spacing:1px; }
+.brand-sub  { color:var(--t3); font-size:10px; }
+.sp { flex:1; }
+.save-badge {
+  font-size:10px; padding:3px 8px; border-radius:8px;
+  background:rgba(63,185,80,.12); color:var(--green);
+  border:1px solid rgba(63,185,80,.25); transition:all .3s;
+  white-space:nowrap;
+}
+.save-badge.saving { background:rgba(232,129,45,.12); color:var(--orange); border-color:rgba(232,129,45,.25); }
+
+/* top bar icon buttons — bigger touch targets */
+.icon-btn {
+  background: transparent;
+  border: 1px solid var(--b1);
+  color: var(--t2);
+  width: 36px; height: 36px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  -webkit-touch-callout: none;
+}
+.icon-btn:active { background: rgba(255,255,255,.07); }
+
+/* ── LAYOUT ── */
+.layout { display:flex; flex:1; overflow:hidden; position:relative; }
+
+/* ── SIDEBAR — slides over on mobile ── */
+.sidebar {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 240px;
+  background: var(--bg2);
+  border-right: 1px solid var(--b1);
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  transform: translateX(-100%);
+  transition: transform .25s cubic-bezier(.4,0,.2,1);
+  overflow: hidden;
+}
+.sidebar.open { transform: translateX(0); }
+
+/* overlay behind sidebar on mobile */
+.sb-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  z-index: 99;
+}
+.sb-overlay.show { display: block; }
+
+.sb-head { padding:10px 14px 8px; border-bottom:1px solid var(--b1); font-size:10px; letter-spacing:1.2px; text-transform:uppercase; color:var(--t3); font-weight:600; display:flex; align-items:center; justify-content:space-between; }
+.sb-close { background:transparent; border:none; color:var(--t2); font-size:18px; cursor:pointer; padding:2px 4px; }
+.sb-scroll { overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch; }
+.sb-sec { padding:4px 0; border-bottom:1px solid var(--b1); }
+.sb-lbl { padding:5px 14px; font-size:10px; text-transform:uppercase; letter-spacing:.8px; color:var(--t3); }
+/* bigger touch items */
+.sb-item {
+  padding: 9px 14px 9px 22px;
+  cursor: pointer;
+  display: flex; align-items: center; gap:7px;
+  color: var(--t2); font-size:12px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  -webkit-touch-callout: none;
+}
+.sb-item:active { background: rgba(255,255,255,.07); color:var(--t1); }
+.sb-item.active { background:rgba(63,185,80,.1); color:var(--green); }
+.sb-item .ic { font-size:11px; opacity:.7; flex-shrink:0; }
+.conn-row { padding:8px 14px; display:flex; align-items:center; gap:8px; color:var(--cyan); font-size:12px; font-weight:600; }
+.pulse { width:7px; height:7px; border-radius:50%; background:var(--green); box-shadow:0 0 4px var(--green); animation:pulse 2s infinite; flex-shrink:0; }
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+.db-info-row { padding:2px 14px 6px; font-size:10px; color:var(--t3); }
+.sb-brand { padding:10px 14px; border-top:1px solid var(--b1); flex-shrink:0; }
+.sb-brand-name { font-size:12px; color:var(--orange); font-weight:700; }
+.sb-brand-ver  { font-size:10px; color:var(--t3); margin-top:2px; }
+
+/* ── TERMINAL ── */
+.term-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg0);
+  width: 100%;
+}
+
+#term-out {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 14px 6px;
+  /* scroll to bottom works on iOS */
+  overscroll-behavior: contain;
+}
+
+/* ── SQL KEYWORD TOOLBAR (above iOS keyboard) ── */
+.kw-toolbar {
+  display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  background: #111820;
+  border-top: 1px solid var(--b1);
+  border-bottom: 1px solid var(--b1);
+  padding: 5px 6px;
+  gap: 5px;
+  flex-shrink: 0;
+  scrollbar-width: none;
+}
+.kw-toolbar::-webkit-scrollbar { display:none; }
+.kw-btn {
+  background: var(--bg3);
+  border: 1px solid var(--b1);
+  color: var(--cyan);
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+.kw-btn:active { background: rgba(88,216,255,.12); }
+.kw-btn.action { color:var(--orange); }
+.kw-btn.danger { color:var(--red); }
+.kw-btn.special { color:var(--green); }
+
+/* ── INPUT AREA ── */
+.input-area {
+  display: flex;
+  align-items: flex-end;
+  padding: 6px 10px;
+  padding-bottom: calc(6px + var(--sab));
+  gap: 6px;
+  background: var(--bg0);
+  border-top: 1px solid var(--b1);
+  flex-shrink: 0;
+}
+.prompt-label {
+  color: var(--green);
+  font-weight: 700;
+  white-space: nowrap;
+  user-select: none;
+  flex-shrink: 0;
+  font-size: 13px;
+  padding-bottom: 4px;
+  font-family: 'JetBrains Mono', monospace;
+}
+#cmd-input {
+  flex: 1;
+  background: var(--bg2);
+  border: 1px solid var(--b1);
+  border-radius: 8px;
+  outline: none;
+  color: var(--t1);
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-size: 13px;
+  caret-color: var(--green);
+  line-height: 1.5;
+  resize: none;
+  min-height: 34px;
+  max-height: 120px;
+  padding: 7px 10px;
+  /* prevent iOS zoom on focus */
+  font-size: 16px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.send-btn {
+  background: var(--orange);
+  border: none;
+  color: #fff;
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex; align-items:center; justify-content:center;
+}
+.send-btn:active { background: #f09a42; transform:scale(.95); }
+
+/* ── OUTPUT ── */
+.ol { white-space:pre-wrap; word-break:break-word; margin:0; font-size:13px; line-height:1.6; font-family:'JetBrains Mono','Courier New',monospace; }
+.ok   { color:var(--green); }
+.err  { color:var(--red); }
+.info { color:var(--cyan); }
+.warn { color:var(--yellow); }
+.muted{ color:var(--t3); }
+.o-prompt { color:var(--green); font-weight:700; }
+.o-cmd    { color:var(--t1); }
+.o-cont   { color:var(--t3); }
+.blank    { height:6px; }
+
+/* ── TABLE ── */
+.tbox { margin:3px 0; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.tbox-inner { display:inline-block; min-width:100%; }
+.tbox-line { font-family:'JetBrains Mono','Courier New',monospace; font-size:12px; line-height:1.5; white-space:pre; }
+.tbox-sep { color:var(--b2); }
+.tbox-hdr { color:var(--cyan); font-weight:600; }
+.tbox-row { color:var(--t1); }
+.ri { color:var(--green); font-size:12px; margin:2px 0 5px; font-family:'JetBrains Mono',monospace; }
+
+/* ── WELCOME ── */
+.welcome { color:var(--t2); line-height:1.9; margin-bottom:4px; font-family:'JetBrains Mono',monospace; font-size:13px; }
+.welcome .logo { color:var(--orange); font-weight:700; font-size:15px; }
+
+/* ── DESKTOP — sidebar always visible ── */
+@media (min-width: 768px) {
+  .sidebar {
+    position: relative;
+    transform: none !important;
+    width: 210px;
+    flex-shrink: 0;
+  }
+  .sidebar.hidden-desktop { width:0; overflow:hidden; border:none; }
+  .sb-overlay { display:none !important; }
+  .sb-close { display:none; }
+  #cmd-input { font-size:13px; }
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div>
+  <button class="icon-btn" id="nav-toggle" onclick="toggleSidebar()" title="Navigator">☰</button>
+  <div class="brand">
+    <span class="brand-name">VISMAY</span>
+    <span style="color:var(--t2);font-size:13px;">DBMS</span>
+    <span class="brand-sub" id="topbar-db"></span>
+  </div>
+  <div class="sp"></div>
+  <span class="save-badge" id="save-badge">💾 Saved</span>
+  <button class="icon-btn" onclick="exportSQL()" title="Export">⬇</button>
+  <button class="icon-btn" onclick="resetDb()" title="Reset" style="color:var(--red)">🗑</button>
+</div>
+
+<div class="layout">
+
+  <!-- SIDEBAR OVERLAY -->
+  <div class="sb-overlay" id="sb-overlay" onclick="closeSidebar()"></div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebar">
+    <div class="sb-head">
+      Navigator
+      <button class="sb-close" onclick="closeSidebar()">✕</button>
+    </div>
+    <div class="sb-scroll">
+      <div class="sb-sec">
+        <div class="conn-row"><div class="pulse"></div><span id="conn-label">default</span></div>
+        <div class="db-info-row" id="db-info"></div>
+      </div>
+      <div class="sb-sec">
+        <div class="sb-lbl">Databases</div>
+        <div id="db-list"></div>
+      </div>
+      <div class="sb-sec">
+        <div class="sb-lbl">Tables</div>
+        <div id="tbl-list"></div>
+      </div>
+      <div class="sb-sec">
+        <div class="sb-lbl">Quick</div>
+        <div class="sb-item" onclick="quickAndClose('SHOW DATABASES;')"><span class="ic">▶</span>SHOW DATABASES</div>
+        <div class="sb-item" onclick="quickAndClose('SHOW TABLES;')"><span class="ic">▶</span>SHOW TABLES</div>
+        <div class="sb-item" onclick="quickAndClose('SELECT VERSION();')"><span class="ic">▶</span>VERSION()</div>
+        <div class="sb-item" onclick="quickAndClose('SELECT NOW();')"><span class="ic">▶</span>NOW()</div>
+        <div class="sb-item" onclick="quickAndClose('STATUS;')"><span class="ic">▶</span>STATUS</div>
+        <div class="sb-item" onclick="quickAndClose('help;')"><span class="ic">▶</span>HELP</div>
+      </div>
+    </div>
+    <div class="sb-brand">
+      <div class="sb-brand-name">⚡ VISMAY DBMS</div>
+      <div class="sb-brand-ver">MySQL Terminal v2.0 · iOS Ready</div>
+    </div>
+  </div>
+
+  <!-- MAIN TERMINAL -->
+  <div class="term-wrap" id="term-wrap">
+
+    <!-- OUTPUT HISTORY -->
+    <div id="term-out"></div>
+
+    <!-- SQL KEYWORD QUICK-TAP TOOLBAR -->
+    <div class="kw-toolbar" id="kw-toolbar">
+      <button class="kw-btn special" onclick="insertKw('SELECT * FROM ')">SELECT</button>
+      <button class="kw-btn special" onclick="insertKw('INSERT INTO ')">INSERT</button>
+      <button class="kw-btn special" onclick="insertKw('UPDATE ')">UPDATE</button>
+      <button class="kw-btn special" onclick="insertKw('DELETE FROM ')">DELETE</button>
+      <button class="kw-btn action"  onclick="insertKw('CREATE TABLE ')">CREATE TABLE</button>
+      <button class="kw-btn action"  onclick="insertKw('CREATE DATABASE ')">CREATE DB</button>
+      <button class="kw-btn action"  onclick="insertKw('USE ')">USE</button>
+      <button class="kw-btn"         onclick="insertKw('DROP TABLE ')">DROP TABLE</button>
+      <button class="kw-btn"         onclick="insertKw('DROP DATABASE ')">DROP DB</button>
+      <button class="kw-btn"         onclick="insertKw('WHERE ')">WHERE</button>
+      <button class="kw-btn"         onclick="insertKw('JOIN ')">JOIN</button>
+      <button class="kw-btn"         onclick="insertKw('INNER JOIN  ON ')">INNER JOIN</button>
+      <button class="kw-btn"         onclick="insertKw('LEFT JOIN  ON ')">LEFT JOIN</button>
+      <button class="kw-btn"         onclick="insertKw('GROUP BY ')">GROUP BY</button>
+      <button class="kw-btn"         onclick="insertKw('ORDER BY ')">ORDER BY</button>
+      <button class="kw-btn"         onclick="insertKw('HAVING ')">HAVING</button>
+      <button class="kw-btn"         onclick="insertKw('LIMIT ')">LIMIT</button>
+      <button class="kw-btn"         onclick="insertKw('VALUES ')">VALUES</button>
+      <button class="kw-btn"         onclick="insertKw('SET ')">SET</button>
+      <button class="kw-btn"         onclick="insertKw('DESCRIBE ')">DESCRIBE</button>
+      <button class="kw-btn"         onclick="insertKw('SHOW TABLES;')">SHOW TABLES</button>
+      <button class="kw-btn"         onclick="insertKw('SHOW DATABASES;')">SHOW DBS</button>
+      <button class="kw-btn"         onclick="insertKw('PRIMARY KEY ')">PRI KEY</button>
+      <button class="kw-btn"         onclick="insertKw('NOT NULL ')">NOT NULL</button>
+      <button class="kw-btn"         onclick="insertKw('AUTOINCREMENT')">AUTO INC</button>
+      <button class="kw-btn"         onclick="insertKw('INTEGER ')">INTEGER</button>
+      <button class="kw-btn"         onclick="insertKw('TEXT ')">TEXT</button>
+      <button class="kw-btn"         onclick="insertKw('REAL ')">REAL</button>
+      <button class="kw-btn"         onclick="insertKw('CREATE VIEW  AS ')">VIEW</button>
+      <button class="kw-btn"         onclick="insertKw('CREATE TRIGGER ')">TRIGGER</button>
+      <button class="kw-btn"         onclick="insertKw('BEGIN;\n\nCOMMIT;')">TRANSACTION</button>
+      <button class="kw-btn"         onclick="insertKw('CREATE INDEX  ON ')">INDEX</button>
+      <button class="kw-btn danger"  onclick="clearInput()">✕ Clear</button>
+      <button class="kw-btn special" onclick="insertSemicolon()">; Run</button>
+      <!-- PL/SQL buttons -->
+      <div style="width:1px;background:var(--b1);margin:0 3px;flex-shrink:0"></div>
+      <button class="kw-btn" style="color:var(--purple)" onclick="insertKw('DECLARE\n  v_ NUMBER := 0;\nBEGIN\n  \nEND;')">DECLARE</button>
+      <button class="kw-btn" style="color:var(--purple)" onclick="insertKw('BEGIN\n  \nEND;')">BEGIN</button>
+      <button class="kw-btn" style="color:var(--purple)" onclick="insertKw('IF  THEN\n  \nEND IF;')">IF</button>
+      <button class="kw-btn" style="color:var(--purple)" onclick="insertKw('FOR i IN 1..10 LOOP\n  \nEND LOOP;')">FOR LOOP</button>
+      <button class="kw-btn" style="color:var(--purple)" onclick="insertKw('WHILE  LOOP\n  \nEND LOOP;')">WHILE</button>
+      <button class="kw-btn" style="color:var(--purple)" onclick="insertKw('DBMS_OUTPUT.PUT_LINE();')">PUT_LINE</button>
+      <button class="kw-btn" style="color:var(--purple)" onclick="insertKw('EXCEPTION\n  WHEN OTHERS THEN\n    DBMS_OUTPUT.PUT_LINE(\'Error: \');')">EXCEPTION</button>
+      <button class="kw-btn" style="color:var(--purple)" onclick="insertKw('CREATE OR REPLACE PROCEDURE (p_param IN VARCHAR2) AS\nBEGIN\n  \nEND;')">PROCEDURE</button>
+      <button class="kw-btn" style="color:var(--purple)" onclick="insertKw('CREATE OR REPLACE FUNCTION  RETURN NUMBER AS\nBEGIN\n  RETURN ;\nEND;')">FUNCTION</button>
+      <button class="kw-btn" style="color:var(--purple)" onclick="insertKw('EXEC ')">EXEC</button>
+      <button class="kw-btn" style="color:var(--purple)" onclick="insertKw('SELECT  INTO v_ FROM  WHERE ;')">SELECT INTO</button>
+    </div>
+
+    <!-- INPUT ROW -->
+    <div class="input-area">
+      <span class="prompt-label" id="prompt-label">mysql>&nbsp;</span>
+      <textarea
+        id="cmd-input"
+        rows="1"
+        spellcheck="false"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        placeholder="Type SQL here…"
+      ></textarea>
+      <button class="send-btn" onclick="submitCurrentInput()">↵</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  INDEXEDDB
+// ═══════════════════════════════════════════════════
+const IDB_NAME='vismay_dbms2', IDB_STORE='dbs';
+let idb=null;
+function openIDB(){return new Promise((res,rej)=>{const r=indexedDB.open(IDB_NAME,1);r.onupgradeneeded=e=>e.target.result.createObjectStore(IDB_STORE);r.onsuccess=e=>{idb=e.target.result;res();};r.onerror=e=>rej(e.target.error);});}
+function idbPut(k,v){return new Promise(res=>{const tx=idb.transaction(IDB_STORE,'readwrite');tx.objectStore(IDB_STORE).put(v,k);tx.oncomplete=()=>res(true);tx.onerror=()=>res(false);});}
+function idbGet(k){return new Promise(res=>{const tx=idb.transaction(IDB_STORE,'readonly');const r=tx.objectStore(IDB_STORE).get(k);r.onsuccess=e=>res(e.target.result||null);r.onerror=()=>res(null);});}
+function idbDel(k){return new Promise(res=>{const tx=idb.transaction(IDB_STORE,'readwrite');tx.objectStore(IDB_STORE).delete(k);tx.oncomplete=res;tx.onerror=res;});}
+function idbKeys(){return new Promise(res=>{const tx=idb.transaction(IDB_STORE,'readonly');const r=tx.objectStore(IDB_STORE).getAllKeys();r.onsuccess=e=>res(e.target.result||[]);r.onerror=()=>res([]);});}
+
+// ═══════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════
+let db=null, SQL=null;
+let currentDb='default';
+let cmdHistory=[], histIdx=-1;
+let multilineBuffer='';
+let saveTimer=null;
+let isDesktop = window.innerWidth >= 768;
+
+const termOut   = document.getElementById('term-out');
+const cmdInput  = document.getElementById('cmd-input');
+const promptLbl = document.getElementById('prompt-label');
+const badge     = document.getElementById('save-badge');
+
+// ═══════════════════════════════════════════════════
+//  iOS KEYBOARD FIX
+//  When iOS keyboard opens it shrinks the viewport.
+//  We listen for visualViewport resize and adjust.
+// ═══════════════════════════════════════════════════
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', () => {
+    const vh = window.visualViewport.height;
+    document.body.style.height = vh + 'px';
+    scrollBottom();
+  });
+}
+
+// Prevent page scroll on iOS when touching terminal output
+document.getElementById('term-out').addEventListener('touchmove', e => {
+  e.stopPropagation();
+}, { passive: true });
+
+// ═══════════════════════════════════════════════════
+//  SAVE / LOAD
+// ═══════════════════════════════════════════════════
+async function listDatabases(){
+  const keys=await idbKeys();
+  return keys.filter(k=>k.startsWith('db:')).map(k=>k.slice(3));
+}
+function schedSave(){
+  badge.textContent='💾 Saving…'; badge.className='save-badge saving';
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(async()=>{
+    if(!db)return;
+    await idbPut('db:'+currentDb, db.export());
+    badge.textContent='💾 Saved'; badge.className='save-badge';
+    updateSidebarInfo();
+  },500);
+}
+async function switchDb(name){
+  if(db){await idbPut('db:'+currentDb, db.export());}
+  const data=await idbGet('db:'+name);
+  db=data?new SQL.Database(data):new SQL.Database();
+  if(!data){await idbPut('db:'+name, db.export());}
+  currentDb=name;
+  updatePrompt();
+  updateSidebarInfo();
+  refreshSidebar();
+}
+
+// ═══════════════════════════════════════════════════
+//  OUTPUT HELPERS
+// ═══════════════════════════════════════════════════
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function print(text, cls=''){
+  const d=document.createElement('div');
+  d.className='ol '+(cls||'');
+  d.textContent=text;
+  termOut.appendChild(d);
+  scrollBottom();
+}
+function pH(html){
+  const d=document.createElement('div');
+  d.innerHTML=html;
+  termOut.appendChild(d);
+  scrollBottom();
+}
+function blank(){
+  const d=document.createElement('div'); d.className='blank'; termOut.appendChild(d);
+}
+function scrollBottom(){
+  requestAnimationFrame(()=>{ termOut.scrollTop=termOut.scrollHeight; });
+}
+function echoCmd(lines){
+  lines.forEach((line,i)=>{
+    const d=document.createElement('div'); d.className='ol';
+    const pfx=i===0
+      ?`<span class="o-prompt">${esc(currentDb)}&gt;&nbsp;</span>`
+      :`<span class="o-cont">    -&gt; </span>`;
+    d.innerHTML=pfx+`<span class="o-cmd">${esc(line)}</span>`;
+    termOut.appendChild(d);
+  });
+  scrollBottom();
+}
+
+// ═══════════════════════════════════════════════════
+//  TABLE RENDERER  (MySQL +----+----+ style)
+// ═══════════════════════════════════════════════════
+function renderTable(columns, rows, elapsed){
+  if(!columns||!columns.length)return;
+  const widths=columns.map((c,i)=>{
+    let w=String(c).length;
+    rows.forEach(r=>{const v=r[i];const s=v===null?'NULL':String(v);w=Math.max(w,s.length);});
+    return Math.min(w,40);
+  });
+  const sep='+'+widths.map(w=>'-'.repeat(w+2)).join('+')+'+';
+  const fmtRow=(cells,hdr=false)=>'| '+cells.map((c,i)=>{
+    const s=c===null?'NULL':String(c).substring(0,widths[i]);
+    return s.padEnd(widths[i]);
+  }).join(' | ')+' |';
+
+  const wrap=document.createElement('div'); wrap.className='tbox';
+  const inner=document.createElement('div'); inner.className='tbox-inner';
+
+  const addLine=(text,cls)=>{
+    const d=document.createElement('div');
+    d.className='tbox-line tbox-'+cls;
+    d.textContent=text;
+    inner.appendChild(d);
+  };
+  addLine(sep,'sep');
+  addLine(fmtRow(columns),'hdr');
+  addLine(sep,'sep');
+  rows.forEach(r=>addLine(fmtRow(r),'row'));
+  addLine(sep,'sep');
+  wrap.appendChild(inner);
+  termOut.appendChild(wrap);
+
+  const n=rows.length;
+  const ri=document.createElement('div'); ri.className='ri';
+  ri.innerHTML=`${n} row${n!==1?'s':''} in set <span style="color:var(--t3);font-size:11px">(${elapsed} ms)</span>`;
+  termOut.appendChild(ri);
+  blank();
+  scrollBottom();
+}
+function vTable(cols,rows){renderTable(cols,rows,'0.00');}
+
+// ═══════════════════════════════════════════════════
+//  PROMPT / SIDEBAR INFO
+// ═══════════════════════════════════════════════════
+function updatePrompt(){
+  promptLbl.textContent=multilineBuffer.trim()?'    -> ':`${currentDb}> `;
+  document.getElementById('conn-label').textContent=currentDb;
+  document.getElementById('topbar-db').textContent=`· ${currentDb}`;
+}
+function updateSidebarInfo(){
+  try{
+    const data=db?db.export():new Uint8Array(0);
+    document.getElementById('db-info').textContent=`${currentDb} · ${(data.length/1024).toFixed(1)} KB`;
+  }catch(e){}
+}
+function refreshSidebar(){
+  listDatabases().then(dbs=>{
+    const dl=document.getElementById('db-list'); dl.innerHTML='';
+    if(!dbs.length){dl.innerHTML='<div class="sb-item" style="color:var(--t3);font-style:italic;padding-left:14px">None</div>';return;}
+    dbs.forEach(name=>{
+      const item=document.createElement('div');
+      item.className='sb-item'+(name===currentDb?' active':'');
+      item.style.paddingLeft='14px';
+      item.innerHTML=`<span class="ic">${name===currentDb?'🟢':'🗄'}</span>${esc(name)}`;
+      item.onclick=()=>quickAndClose(`USE ${name};`);
+      dl.appendChild(item);
+    });
+  });
+  if(!db)return;
+  try{
+    const r=db.exec("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name");
+    const tl=document.getElementById('tbl-list'); tl.innerHTML='';
+    if(!r.length||!r[0].values.length){tl.innerHTML='<div class="sb-item" style="color:var(--t3);font-style:italic;padding-left:14px">No tables</div>';return;}
+    r[0].values.forEach(row=>{
+      const item=document.createElement('div'); item.className='sb-item';
+      item.innerHTML=`<span class="ic">📋</span>${esc(row[0])}`;
+      item.onclick=()=>quickAndClose(`DESCRIBE ${row[0]};`);
+      tl.appendChild(item);
+    });
+  }catch(e){}
+  updateSidebarInfo();
+}
+
+// ═══════════════════════════════════════════════════
+//  SIDEBAR TOGGLE
+// ═══════════════════════════════════════════════════
+function toggleSidebar(){
+  const sb=document.getElementById('sidebar');
+  const ov=document.getElementById('sb-overlay');
+  if(isDesktop){
+    sb.classList.toggle('hidden-desktop');
+  } else {
+    const open=sb.classList.toggle('open');
+    ov.classList.toggle('show', open);
+  }
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sb-overlay').classList.remove('show');
+}
+window.addEventListener('resize',()=>{
+  isDesktop=window.innerWidth>=768;
+  if(isDesktop) closeSidebar();
+});
+
+// ═══════════════════════════════════════════════════
+//  KEYWORD TOOLBAR HELPERS
+// ═══════════════════════════════════════════════════
+
+// Track cursor position manually because iOS loses selectionStart on blur
+let savedCursorPos = 0;
+
+cmdInput.addEventListener('keyup',   () => { savedCursorPos = cmdInput.selectionStart; });
+cmdInput.addEventListener('click',   () => { savedCursorPos = cmdInput.selectionStart; });
+cmdInput.addEventListener('input',   () => { savedCursorPos = cmdInput.selectionStart; });
+cmdInput.addEventListener('focus',   () => { savedCursorPos = cmdInput.selectionStart; });
+
+function insertKw(text){
+  const el = cmdInput;
+
+  // Use savedCursorPos — reliable on iOS
+  const pos  = savedCursorPos !== undefined ? savedCursorPos : el.value.length;
+  const before = el.value.substring(0, pos);
+  const after  = el.value.substring(pos);
+
+  el.value = before + text + after;
+  const newPos = pos + text.length;
+
+  // Restore focus and cursor
+  el.focus();
+  try {
+    el.setSelectionRange(newPos, newPos);
+  } catch(e) {}
+  savedCursorPos = newPos;
+  resizeInput();
+}
+
+function insertSemicolon(){
+  const el = cmdInput;
+  if(!el.value.trim().endsWith(';')) el.value = el.value.trimEnd() + ';';
+  submitCurrentInput();
+}
+
+function clearInput(){
+  cmdInput.value = '';
+  multilineBuffer = '';
+  savedCursorPos = 0;
+  updatePrompt();
+  resizeInput();
+  cmdInput.focus();
+}
+
+// Prevent ALL keyword toolbar buttons from stealing focus from the textarea
+document.getElementById('kw-toolbar').addEventListener('mousedown', e => {
+  e.preventDefault(); // stops blur on desktop
+});
+document.getElementById('kw-toolbar').addEventListener('touchstart', e => {
+  // Save cursor before touch causes blur on iOS
+  savedCursorPos = cmdInput.selectionStart;
+}, { passive: true });
+
+// ═══════════════════════════════════════════════════
+//  SUBMIT
+// ═══════════════════════════════════════════════════
+function submitCurrentInput(){
+  const val=cmdInput.value;
+  cmdInput.value=''; resizeInput();
+  submitLine(val);
+}
+
+function submitLine(line){
+  const trimmed=line.trim();
+  if(!trimmed&&!multilineBuffer) return;
+
+  multilineBuffer=multilineBuffer?multilineBuffer+'\n'+line:line;
+
+  const full=multilineBuffer.trim();
+  const lower=full.toLowerCase().replace(/\s+/g,' ');
+
+  // Special no-semicolon commands
+  const noSemi=['\\h','\\c','\\q','exit','quit','help','status','\\s'].some(c=>lower===c||lower===c+';');
+
+  // PL/SQL blocks — complete when they end with END; or END / (Oracle style)
+  const isPLSQLBlock = /^(?:declare\b|begin\b)/i.test(full)
+                    || /^create\s+(or\s+replace\s+)?(?:procedure|function)\s+/i.test(full);
+  const isPLSQLExec  = /^(?:exec(?:ute)?|call)\s+/i.test(full);
+
+  let complete = false;
+  if(noSemi){
+    complete = true;
+  } else if(isPLSQLBlock){
+    // Complete when last non-empty line is END; or END / or just /
+    complete = /end\s*;?\s*\/?\s*$/i.test(full) || /^\s*\/\s*$/.test(line);
+  } else if(isPLSQLExec){
+    complete = true; // EXEC proc; is single line
+  } else {
+    complete = full.endsWith(';');
+  }
+
+  if(!complete){ updatePrompt(); return; }
+
+  echoCmd(multilineBuffer.split('\n'));
+  // Strip trailing / (Oracle style terminator)
+  const sql=multilineBuffer.trim().replace(/\s*\/\s*$/, '').replace(/;+$/,'');
+  multilineBuffer=''; updatePrompt();
+  executeSQL(sql);
+}
+
+// ═══════════════════════════════════════════════════
+//  PL/SQL INTERPRETER ENGINE
+// ═══════════════════════════════════════════════════
+
+// Stored procedures & functions registry
+const plsqlProcedures = {};
+const plsqlFunctions  = {};
+
+// Output buffer for DBMS_OUTPUT
+let dbmsOutputBuffer = [];
+
+function plsqlOutput(msg){
+  dbmsOutputBuffer.push(String(msg));
+}
+
+// ── Tokenizer / helpers ──────────────────────────
+
+function plsqlStripComments(src){
+  // Remove -- line comments and /* */ block comments
+  return src
+    .replace(/--[^\n]*/g,'')
+    .replace(/\/\*[\s\S]*?\*\//g,'');
+}
+
+// Evaluate a PL/SQL expression value in a given variable scope
+function plsqlEval(expr, vars){
+  expr = expr.trim();
+
+  // NULL
+  if(/^null$/i.test(expr)) return null;
+
+  // String literal
+  if(/^'([^']*)'$/.test(expr)) return expr.slice(1,-1);
+
+  // Number literal
+  if(/^-?\d+(\.\d+)?$/.test(expr)) return parseFloat(expr);
+
+  // Boolean literals
+  if(/^true$/i.test(expr))  return true;
+  if(/^false$/i.test(expr)) return false;
+
+  // String concat  ||
+  if(expr.includes('||')){
+    return expr.split('||').map(p=>plsqlEval(p.trim(),vars)).join('');
+  }
+
+  // Arithmetic / comparison — build a safe JS eval string
+  let jsExpr = expr;
+
+  // Replace variable names with their values
+  const sortedKeys = Object.keys(vars).sort((a,b)=>b.length-a.length);
+  for(const k of sortedKeys){
+    const re = new RegExp('\\b'+k+'\\b','gi');
+    const v  = vars[k];
+    if(v===null)        jsExpr=jsExpr.replace(re,'null');
+    else if(typeof v==='string') jsExpr=jsExpr.replace(re,JSON.stringify(v));
+    else                jsExpr=jsExpr.replace(re, String(v));
+  }
+
+  // Replace Oracle operators
+  jsExpr = jsExpr
+    .replace(/\bMOD\b/gi,'%')
+    .replace(/\bAND\b/gi,'&&')
+    .replace(/\bOR\b/gi,'||')
+    .replace(/\bNOT\b/gi,'!')
+    .replace(/<>/g,'!==')
+    .replace(/\bIS\s+NULL\b/gi,'=== null')
+    .replace(/\bIS\s+NOT\s+NULL\b/gi,'!== null');
+
+  // DB query functions: use db.exec inline
+  // e.g.  (SELECT COUNT(*) FROM t)
+  const sqlExprMatch = jsExpr.match(/^\s*\(SELECT\s+(.+)\)\s*$/i);
+  if(sqlExprMatch){
+    try{
+      const r=db.exec('SELECT '+sqlExprMatch[1]);
+      if(r.length&&r[0].values.length) return r[0].values[0][0];
+      return null;
+    }catch(e){ return null; }
+  }
+
+  try{
+    // eslint-disable-next-line no-new-func
+    return (new Function('return ('+jsExpr+')'))();
+  }catch(e){
+    return expr; // return raw if eval fails
+  }
+}
+
+// ── Statement executor ───────────────────────────
+
+function plsqlExecStmt(stmt, vars){
+  stmt = stmt.trim();
+  if(!stmt) return;
+
+  const upper = stmt.toUpperCase().replace(/\s+/g,' ');
+
+  // DBMS_OUTPUT.PUT_LINE(...)
+  const putm = stmt.match(/^DBMS_OUTPUT\.PUT_LINE\s*\((.+)\)\s*$/i);
+  if(putm){
+    plsqlOutput(plsqlEval(putm[1],vars));
+    return;
+  }
+
+  // RAISE_APPLICATION_ERROR / RAISE
+  const raisem = stmt.match(/^RAISE(?:_APPLICATION_ERROR\s*\([^,]+,\s*'([^']+)'\s*\)|)\s*$/i);
+  if(raisem){
+    throw new Error(raisem[1]||'User-defined exception raised');
+  }
+  const raisem2 = stmt.match(/^RAISE\s+(.+)$/i);
+  if(raisem2){ throw new Error(raisem2[1]); }
+
+  // Variable assignment:  v_name := expr
+  const assignm = stmt.match(/^(\w+)\s*:=\s*(.+)$/i);
+  if(assignm){
+    const varName = assignm[1].toLowerCase();
+    const valExpr = assignm[2].trim();
+
+    // SELECT ... INTO var FROM ...
+    const selInto = valExpr.match(/^SELECT\s+(.+?)\s+INTO\s+(\w+(?:\s*,\s*\w+)*)\s+FROM\s+(.+)$/i);
+    if(selInto){
+      try{
+        const r=db.exec('SELECT '+selInto[1]+' FROM '+selInto[3]);
+        if(r.length&&r[0].values.length){
+          const row=r[0].values[0];
+          const intoVars=selInto[2].split(',').map(v=>v.trim().toLowerCase());
+          intoVars.forEach((vn,i)=>{ vars[vn]=row[i]??null; });
+        }
+      }catch(e){ throw e; }
+      return;
+    }
+
+    vars[varName] = plsqlEval(valExpr, vars);
+    return;
+  }
+
+  // SELECT ... INTO var1, var2 FROM ...
+  const selIntoStmt = stmt.match(/^SELECT\s+(.+?)\s+INTO\s+(.+?)\s+FROM\s+(.+)$/i);
+  if(selIntoStmt){
+    try{
+      const r=db.exec('SELECT '+selIntoStmt[1]+' FROM '+selIntoStmt[3]);
+      if(r.length&&r[0].values.length){
+        const row=r[0].values[0];
+        const intoVars=selIntoStmt[2].split(',').map(v=>v.trim().replace(/^:/,'').toLowerCase());
+        intoVars.forEach((vn,i)=>{ vars[vn]=row[i]??null; });
+      }else{
+        throw new Error('NO_DATA_FOUND');
+      }
+    }catch(e){ throw e; }
+    return;
+  }
+
+  // EXEC / CALL procedure
+  const execm = stmt.match(/^(?:EXEC(?:UTE)?|CALL)\s+(\w+)\s*\(?(.*?)\)?\s*$/i);
+  if(execm){
+    plsqlCallProc(execm[1], execm[2], vars);
+    return;
+  }
+
+  // Plain SQL — run it
+  try{
+    const t0=performance.now();
+    const results=db.exec(stmt);
+    const ms=(performance.now()-t0).toFixed(2);
+    if(results&&results.length){
+      results.forEach(r=>renderTable(r.columns,r.values,ms));
+    }else{
+      const affected=db.getRowsModified();
+      plsqlOutput(`Query OK, ${affected} row(s) affected (${ms} ms)`);
+    }
+  }catch(e){ throw e; }
+}
+
+// ── Block executor ────────────────────────────────
+// Parses and runs a PL/SQL-style block
+// Returns nothing; side effects via plsqlOutput / renderTable
+
+function plsqlRunBlock(src, vars){
+  src = plsqlStripComments(src).trim();
+
+  // ── IF / ELSIF / ELSE / END IF ─────────────────
+  const ifm = src.match(/^IF\s+(.+?)\s+THEN\s+([\s\S]*?)((?:ELSIF\s+.+?\s+THEN\s+[\s\S]*?)*)((?:ELSE\s+[\s\S]*?)?)END\s+IF\s*$/i);
+  if(ifm){
+    const cond    = plsqlEval(ifm[1], vars);
+    const thenBlk = ifm[2];
+    const elsifRaw= ifm[3];
+    const elseBlk = ifm[4]?.replace(/^ELSE\s*/i,'');
+
+    if(cond){
+      plsqlRunStatements(thenBlk, vars);
+    } else {
+      // Try ELSIF branches
+      let handled = false;
+      const elsifParts = [...elsifRaw.matchAll(/ELSIF\s+(.+?)\s+THEN\s+([\s\S]*?)(?=ELSIF|$)/gi)];
+      for(const ep of elsifParts){
+        if(plsqlEval(ep[1],vars)){
+          plsqlRunStatements(ep[2],vars);
+          handled=true; break;
+        }
+      }
+      if(!handled && elseBlk){
+        plsqlRunStatements(elseBlk, vars);
+      }
+    }
+    return;
+  }
+
+  // ── LOOP ... EXIT WHEN ... END LOOP ───────────
+  const loopm = src.match(/^LOOP\s+([\s\S]*?)\s+END\s+LOOP\s*$/i);
+  if(loopm){
+    let iterations=0;
+    while(true){
+      if(++iterations>10000){ plsqlOutput('ERROR: Infinite loop detected (>10000 iterations)'); break; }
+      try{ plsqlRunStatements(loopm[1], vars); }
+      catch(e){
+        if(e.message==='__EXIT__') break;
+        throw e;
+      }
+    }
+    return;
+  }
+
+  // ── WHILE ... LOOP ... END LOOP ───────────────
+  const whilem = src.match(/^WHILE\s+(.+?)\s+LOOP\s+([\s\S]*?)\s+END\s+LOOP\s*$/i);
+  if(whilem){
+    let iterations=0;
+    while(plsqlEval(whilem[1],vars)){
+      if(++iterations>10000){ plsqlOutput('ERROR: Infinite loop detected'); break; }
+      try{ plsqlRunStatements(whilem[2], vars); }
+      catch(e){ if(e.message==='__EXIT__') break; throw e; }
+    }
+    return;
+  }
+
+  // ── FOR i IN low..high LOOP ... END LOOP ─────
+  const form = src.match(/^FOR\s+(\w+)\s+IN\s+(-?\d+)\s*\.\.\s*(-?\d+)(?:\s+STEP\s+(-?\d+))?\s+LOOP\s+([\s\S]*?)\s+END\s+LOOP\s*$/i);
+  if(form){
+    const loopVar=form[1].toLowerCase();
+    const lo=parseInt(form[2]), hi=parseInt(form[3]), step=parseInt(form[4]||1);
+    let iterations=0;
+    for(let i=lo; i<=hi; i+=step){
+      if(++iterations>10000){ plsqlOutput('ERROR: Loop limit exceeded'); break; }
+      vars[loopVar]=i;
+      try{ plsqlRunStatements(form[5], vars); }
+      catch(e){ if(e.message==='__EXIT__') break; throw e; }
+    }
+    return;
+  }
+
+  // ── FOR cursor loop ───────────────────────────
+  const forcursm = src.match(/^FOR\s+(\w+)\s+IN\s*\((.+)\)\s+LOOP\s+([\s\S]*?)\s+END\s+LOOP\s*$/is);
+  if(forcursm){
+    const rowVar=forcursm[1].toLowerCase();
+    const qry=forcursm[2];
+    const body=forcursm[3];
+    try{
+      const r=db.exec(qry);
+      if(r.length){
+        const cols=r[0].columns;
+        let iterations=0;
+        for(const row of r[0].values){
+          if(++iterations>10000){ plsqlOutput('ERROR: Cursor loop limit exceeded'); break; }
+          cols.forEach((col,i)=>{ vars[rowVar+'.'+col.toLowerCase()]=row[i]; });
+          try{ plsqlRunStatements(body, vars); }
+          catch(e){ if(e.message==='__EXIT__') break; throw e; }
+        }
+      }
+    }catch(e){ throw e; }
+    return;
+  }
+
+  // ── EXIT WHEN ─────────────────────────────────
+  const exitm = src.match(/^EXIT\s+WHEN\s+(.+)$/i);
+  if(exitm){
+    if(plsqlEval(exitm[1],vars)) throw new Error('__EXIT__');
+    return;
+  }
+  if(/^EXIT\s*$/i.test(src)){ throw new Error('__EXIT__'); }
+
+  // ── CONTINUE ─────────────────────────────────
+  if(/^CONTINUE\s*$/i.test(src)){ return; }
+
+  // ── Single statement ──────────────────────────
+  plsqlExecStmt(src, vars);
+}
+
+// Split a block body into individual statements/sub-blocks
+function plsqlRunStatements(src, vars){
+  src = plsqlStripComments(src).trim();
+  const stmts = plsqlSplitStatements(src);
+  for(const s of stmts){
+    plsqlRunBlock(s.trim(), vars);
+  }
+}
+
+// Smart splitter — splits on ; but respects nested BEGIN/END and IF/END IF
+function plsqlSplitStatements(src){
+  const result=[];
+  let depth=0, cur='', i=0;
+  const tokens=src.split(/\b/);
+  // Simpler char-by-char with keyword tracking
+  src=src+'\n';
+  cur=''; let pos=0;
+
+  while(pos<src.length){
+    // Check for block keywords
+    const rest=src.slice(pos);
+    const kwBegin=/^BEGIN\b/i.exec(rest);
+    const kwIf   =/^IF\b/i.exec(rest);
+    const kwLoop =/^(?:LOOP|WHILE\s+\S.*?\s+LOOP|FOR\s+\S.*?\s+LOOP)\b/i.exec(rest);
+    const kwCase =/^CASE\b/i.exec(rest);
+    const kwEnd  =/^END\b/i.exec(rest);
+
+    if((kwBegin||kwIf||kwLoop||kwCase)&&depth>=0){
+      depth++;
+    }
+    if(kwEnd&&depth>0){
+      depth--;
+    }
+
+    if(src[pos]===';'&&depth===0){
+      if(cur.trim()) result.push(cur.trim());
+      cur=''; pos++; continue;
+    }
+    cur+=src[pos]; pos++;
+  }
+  if(cur.trim()) result.push(cur.trim());
+  return result.filter(s=>s.length>0);
+}
+
+// ── DECLARE...BEGIN...EXCEPTION...END parser ─────
+
+function plsqlExecute(raw){
+  const src = plsqlStripComments(raw).trim();
+  const t0  = performance.now();
+  dbmsOutputBuffer = [];
+
+  // DECLARE ... BEGIN ... [EXCEPTION ...] END
+  const blockm = src.match(/^(?:DECLARE\s+([\s\S]*?)\s+)?BEGIN\s+([\s\S]*?)(?:EXCEPTION\s+([\s\S]*?))?\s+END\s*;?\s*$/i);
+  if(!blockm){
+    // Try plain BEGIN...END without DECLARE
+    const plainm = src.match(/^BEGIN\s+([\s\S]*?)\s+END\s*;?\s*$/i);
+    if(plainm){
+      const vars={};
+      try{
+        plsqlRunStatements(plainm[1], vars);
+      }catch(e){
+        if(e.message!=='__EXIT__') plsqlOutput('EXCEPTION: '+e.message);
+      }
+      plsqlFlushOutput(t0);
+      return true;
+    }
+    return false;
+  }
+
+  // Parse DECLARE section
+  const vars={};
+  const declareSection = blockm[1]||'';
+  if(declareSection){
+    // Each declaration: varname [CONSTANT] type [:= value];
+    const declLines = declareSection.split(';').map(l=>l.trim()).filter(Boolean);
+    for(const decl of declLines){
+      const dm=decl.match(/^(\w+)\s+(?:CONSTANT\s+)?(?:\w+(?:\([^)]*\))?)\s*(?::=\s*(.+))?$/i);
+      if(dm){
+        const vname=dm[1].toLowerCase();
+        const vval =dm[2]?plsqlEval(dm[2],vars):null;
+        vars[vname]=vval;
+      }
+    }
+  }
+
+  const bodySection      = blockm[2]||'';
+  const exceptionSection = blockm[3]||'';
+
+  try{
+    plsqlRunStatements(bodySection, vars);
+  }catch(e){
+    if(e.message==='__EXIT__'){
+      // normal exit
+    } else if(exceptionSection){
+      // Find matching WHEN handler
+      const handlers=[...exceptionSection.matchAll(/WHEN\s+(\w+)\s+THEN\s+([\s\S]*?)(?=WHEN\s+\w+\s+THEN|$)/gi)];
+      let handled=false;
+      for(const h of handlers){
+        if(h[1].toUpperCase()==='OTHERS'||e.message.toUpperCase().includes(h[1].toUpperCase())){
+          plsqlRunStatements(h[2],vars);
+          handled=true; break;
+        }
+      }
+      if(!handled) plsqlOutput('UNHANDLED EXCEPTION: '+e.message);
+    }else{
+      plsqlOutput('EXCEPTION: '+e.message);
+    }
+  }
+
+  plsqlFlushOutput(t0);
+  return true;
+}
+
+// ── CREATE PROCEDURE / FUNCTION ──────────────────
+
+function plsqlCreateProcedure(src){
+  // CREATE [OR REPLACE] PROCEDURE name [(params)] AS|IS body END [name];
+  const m=src.match(/^CREATE\s+(?:OR\s+REPLACE\s+)?PROCEDURE\s+(\w+)\s*(?:\(([^)]*)\))?\s*(?:AS|IS)\s+([\s\S]+?)\s*END(?:\s+\w+)?\s*;?\s*$/i);
+  if(!m) return false;
+  const pname=m[1].toLowerCase();
+  const params=(m[2]||'').split(',').map(p=>p.trim()).filter(Boolean);
+  const body=m[3];
+  plsqlProcedures[pname]={params, body};
+  print(`Procedure '${m[1]}' created.`,'ok');
+  blank();
+  return true;
+}
+
+function plsqlCreateFunction(src){
+  // CREATE [OR REPLACE] FUNCTION name [(params)] RETURN type AS|IS body END [name];
+  const m=src.match(/^CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(\w+)\s*(?:\(([^)]*)\))?\s*RETURN\s+\w+(?:\([^)]*\))?\s*(?:AS|IS)\s+([\s\S]+?)\s*END(?:\s+\w+)?\s*;?\s*$/i);
+  if(!m) return false;
+  const fname=m[1].toLowerCase();
+  const params=(m[2]||'').split(',').map(p=>p.trim()).filter(Boolean);
+  const body=m[3];
+  plsqlFunctions[fname]={params, body};
+  print(`Function '${m[1]}' created.`,'ok');
+  blank();
+  return true;
+}
+
+function plsqlCallProc(name, argsRaw, callerVars){
+  const pname=name.toLowerCase();
+  const proc=plsqlProcedures[pname];
+  if(!proc){ throw new Error(`Procedure '${name}' not found`); }
+  const args=(argsRaw||'').split(',').map(a=>plsqlEval(a.trim(),callerVars||{}));
+  const vars={};
+  proc.params.forEach((p,i)=>{
+    const pname2=p.replace(/\s+(IN|OUT|IN\s+OUT)\s+\w+.*/i,'').trim().toLowerCase();
+    vars[pname2]=args[i]??null;
+  });
+  plsqlRunStatements(proc.body, vars);
+}
+
+// ── EXEC / CALL (top-level) ───────────────────────
+
+function plsqlExecCall(src){
+  const m=src.match(/^(?:EXEC(?:UTE)?|CALL)\s+(\w+)\s*\(?(.*?)\)?\s*;?\s*$/i);
+  if(!m) return false;
+  dbmsOutputBuffer=[];
+  const t0=performance.now();
+  try{
+    plsqlCallProc(m[1], m[2], {});
+  }catch(e){
+    plsqlOutput('EXCEPTION: '+e.message);
+  }
+  plsqlFlushOutput(t0);
+  return true;
+}
+
+// ── Output flush ─────────────────────────────────
+
+function plsqlFlushOutput(t0){
+  const ms=(performance.now()-t0).toFixed(2);
+  if(dbmsOutputBuffer.length){
+    dbmsOutputBuffer.forEach(line=>{
+      print(line, 'info');
+    });
+  }
+  print(`PL/SQL procedure successfully completed (${ms} ms).`,'ok');
+  blank();
+  dbmsOutputBuffer=[];
+  refreshSidebar();
+  schedSave();
+}
+
+// ── Entry point — detect PL/SQL ───────────────────
+
+function isPLSQL(raw){
+  const u=raw.trim().toUpperCase().replace(/\s+/g,' ');
+  return u.startsWith('BEGIN ')
+      || u.startsWith('DECLARE ')
+      || u.match(/^CREATE\s+(OR\s+REPLACE\s+)?PROCEDURE\s/)
+      || u.match(/^CREATE\s+(OR\s+REPLACE\s+)?FUNCTION\s/)
+      || u.match(/^(?:EXEC(?:UTE)?|CALL)\s+\w+/)
+      || u.startsWith('BEGIN\n')
+      || u==='BEGIN';
+}
+
+// ═══════════════════════════════════════════════════
+//  EXECUTE SQL
+// ═══════════════════════════════════════════════════
+function executeSQL(raw){
+  const sql=raw.trim(); if(!sql)return;
+  if(cmdHistory[cmdHistory.length-1]!==sql+';') cmdHistory.push(sql+';');
+  histIdx=cmdHistory.length;
+
+  const lower=sql.toLowerCase().replace(/\s+/g,' ').trim();
+
+  if(lower==='\\c'){print('Query interrupted.','warn');blank();return;}
+  if(lower==='\\h'||lower==='help'){doHelp();return;}
+  if(lower==='\\q'||lower==='quit'||lower==='exit'){print('Bye','ok');blank();return;}
+  if(lower==='\\s'||lower==='status'){doStatus();return;}
+
+  // ── PL/SQL intercept ───────────────────────────
+  if(isPLSQL(sql)){
+    // CREATE PROCEDURE / FUNCTION
+    if(/^create\s+(or\s+replace\s+)?procedure\s+/i.test(sql)){
+      if(!plsqlCreateProcedure(sql)) print('ERROR: Invalid PROCEDURE syntax','err');
+      return;
+    }
+    if(/^create\s+(or\s+replace\s+)?function\s+/i.test(sql)){
+      if(!plsqlCreateFunction(sql)) print('ERROR: Invalid FUNCTION syntax','err');
+      return;
+    }
+    // EXEC / CALL
+    if(/^(?:exec(?:ute)?|call)\s+/i.test(sql)){
+      if(!plsqlExecCall(sql)) print('ERROR: Procedure not found','err');
+      return;
+    }
+    // Anonymous block
+    if(!plsqlExecute(sql)) print('ERROR: Invalid PL/SQL block','err');
+    return;
+  }
+  // ──────────────────────────────────────────────
+
+  if(lower==='show databases'||lower==='show schemas'){
+    listDatabases().then(dbs=>{
+      if(!dbs.length){print('Empty set (0.00 sec)','muted');blank();return;}
+      vTable(['Database'],dbs.map(d=>[d]));
+    });return;
+  }
+
+  const cdm=lower.match(/^create\s+(?:database|schema)(?:\s+if\s+not\s+exists)?\s+[`']?(\w+)[`']?/);
+  if(cdm){
+    const name=cdm[1];
+    listDatabases().then(async dbs=>{
+      if(dbs.includes(name)){print(`ERROR 1007 (HY000): Can't create database '${name}'; database exists`,'err');}
+      else{const nd=new SQL.Database();await idbPut('db:'+name,nd.export());nd.close();print(`Query OK, 1 row affected (0.00 sec)`,'ok');refreshSidebar();}
+      blank();
+    });return;
+  }
+
+  const ddm=lower.match(/^drop\s+(?:database|schema)(?:\s+if\s+exists)?\s+[`']?(\w+)[`']?/);
+  if(ddm){
+    const name=ddm[1];
+    if(name===currentDb){print(`ERROR 1010 (HY000): Cannot drop the currently open database '${name}'`,'err');print('Hint: USE another_db; first.','muted');blank();return;}
+    listDatabases().then(async dbs=>{
+      if(!dbs.includes(name)){print(`ERROR 1008 (HY000): Can't drop database '${name}'; doesn't exist`,'err');}
+      else{await idbDel('db:'+name);print(`Query OK, 0 rows affected (0.00 sec)`,'ok');refreshSidebar();}
+      blank();
+    });return;
+  }
+
+  const um=lower.match(/^use\s+[`']?(\w+)[`']?/);
+  if(um){switchDb(um[1]).then(()=>{print('Database changed','ok');blank();});return;}
+
+  if(lower==='show tables'||lower.match(/^show tables from\s+\w+/)){
+    try{
+      const r=db.exec("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name");
+      if(r.length&&r[0].values.length) vTable([`Tables_in_${currentDb}`],r[0].values);
+      else{print('Empty set (0.00 sec)','muted');blank();}
+    }catch(e){print('ERROR: '+e.message,'err');blank();}
+    return;
+  }
+
+  const dm=lower.match(/^(?:describe|desc)\s+[`']?(\w+)[`']?/);
+  if(dm){describeTable(dm[1]);return;}
+
+  const scm=lower.match(/^show columns from\s+[`']?(\w+)[`']?/);
+  if(scm){describeTable(scm[1]);return;}
+
+  const sct=lower.match(/^show create table\s+[`']?(\w+)[`']?/);
+  if(sct){
+    const name=sct[1];
+    try{
+      const r=db.exec(`SELECT sql FROM sqlite_master WHERE type='table' AND name='${name}'`);
+      if(r.length&&r[0].values[0]) vTable(['Table','Create Table'],[[name,r[0].values[0][0]]]);
+      else print(`ERROR 1146 (42S02): Table '${currentDb}.${name}' doesn't exist`,'err');
+    }catch(e){print('ERROR: '+e.message,'err');}
+    blank();return;
+  }
+
+  if(lower==='select version()'){vTable(['VERSION()'],[['8.0.35 (VISMAY DBMS)']]);return;}
+  if(lower==='select database()'){vTable(['DATABASE()'],[[currentDb]]);return;}
+  if(lower==='select now()'){vTable(['NOW()'],[[new Date().toISOString().replace('T',' ').split('.')[0]]]);return;}
+  if(lower==='select user()'){vTable(['USER()'],[['root@localhost']]);return;}
+
+  // Real SQL — run through Oracle→SQLite translator first
+  const stmts=splitSQL(sql).map(translateOracleSQL);
+  stmts.forEach(stmtGroup=>{
+    // translateOracleSQL may return an array of statements (e.g. multi-column ADD)
+    const list = Array.isArray(stmtGroup) ? stmtGroup : [stmtGroup];
+    list.forEach(stmt=>{
+      stmt=stmt.trim(); if(!stmt)return;
+      const t0=performance.now();
+      try{
+        const results=db.exec(stmt);
+        const ms=(performance.now()-t0).toFixed(2);
+        const sl=stmt.trim().toLowerCase();
+        if(results&&results.length>0){
+          // Has result rows — render table
+          results.forEach(r=>renderTable(r.columns,r.values,ms));
+        }else if(sl.startsWith('select')||sl.startsWith('with')||sl.match(/^\(\s*select/)){
+          // SELECT that returned 0 rows — show "Empty set" like real MySQL
+          print(`Empty set (${ms} ms)`,'muted');
+          // Try to debug WHY subquery returned nothing
+          const subm = stmt.match(/where\s+\w+\s*=\s*\(\s*(select[^)]+)\)/i);
+          if(subm){
+            try{
+              const subResult = db.exec(subm[1]);
+              if(!subResult.length || !subResult[0].values.length){
+                print(`NOTE: Subquery returned no rows — (${subm[1].trim()}) found nothing`,'warn');
+              } else {
+                print(`NOTE: Subquery returned ${subResult[0].values[0][0]} — but no outer rows matched`,'warn');
+              }
+            }catch(e2){}
+          }
+          blank();
+        }else{
+          const affected=db.getRowsModified();
+          if(sl.startsWith('insert')){
+            const lid=db.exec('SELECT last_insert_rowid()')[0]?.values[0]?.[0]??0;
+            print(`Query OK, ${affected} row${affected!==1?'s':''} affected (${ms} ms)`,'ok');
+            if(lid) print(`Last insert ID: ${lid}`,'muted');
+            blank();
+          }else if(sl.startsWith('update')||sl.startsWith('delete')){
+            print(`Query OK, ${affected} row${affected!==1?'s':''} affected (${ms} ms)`,'ok');
+            if(affected) print(`Rows matched: ${affected}  Changed: ${affected}  Warnings: 0`,'muted');
+            blank();
+          }else{
+            print(`Query OK, 0 rows affected (${ms} ms)`,'ok');
+            blank();
+          }
+        }
+      }catch(e){
+        print(`ERROR 1064 (42000): ${e.message}`,'err'); blank();
+      }
+    });
+  });
+  refreshSidebar();
+  schedSave();
+}
+
+// ═══════════════════════════════════════════════════
+//  ORACLE → SQLITE TRANSLATOR
+//  Converts Oracle/MySQL syntax that SQLite doesn't
+//  natively support into equivalent SQLite statements
+// ═══════════════════════════════════════════════════
+function translateOracleSQL(sql){
+  const s = sql.trim();
+  const u = s.toUpperCase().replace(/\s+/g,' ');
+
+  // ── ALTER TABLE t ADD(col1 type, col2 type, ...) ──
+  // Oracle allows ADD(...) with parentheses and multiple cols
+  // SQLite only supports ADD COLUMN one at a time
+  const addMulti = s.match(/^ALTER\s+TABLE\s+(\w+)\s+ADD\s*\((.+)\)\s*$/i);
+  if(addMulti){
+    const tableName = addMulti[1];
+    const colDefs   = splitColDefs(addMulti[2]);
+    // Return array of individual ALTER TABLE ... ADD COLUMN statements
+    return colDefs.map(col =>
+      `ALTER TABLE ${tableName} ADD COLUMN ${col.trim()}`
+    );
+  }
+
+  // ── ALTER TABLE t ADD col1 type, col2 type (no parens, multi-col) ──
+  // IMPORTANT: only match actual ALTER TABLE statements, never SELECT
+  const addMultiNoParen = s.match(/^ALTER\s+TABLE\s+(\w+)\s+ADD\s+(?!\(|COLUMN\s)(.+)$/i);
+  if(addMultiNoParen){
+    const tableName = addMultiNoParen[1];
+    const rest      = addMultiNoParen[2].trim();
+    // Must look like column definitions (word followed by a type keyword)
+    // NOT a subquery or SELECT statement
+    const looksLikeColDef = /^\w+\s+(INTEGER|TEXT|REAL|BLOB|NUMERIC|DATE|VARCHAR|NUMBER|CHAR|BOOLEAN)/i.test(rest);
+    if(looksLikeColDef){
+      const colDefs = splitColDefs(rest);
+      if(colDefs.length > 1){
+        return colDefs.map(col =>
+          `ALTER TABLE ${tableName} ADD COLUMN ${col.trim()}`
+        );
+      }
+      return `ALTER TABLE ${tableName} ADD COLUMN ${rest}`;
+    }
+  }
+
+  // ── ALTER TABLE t MODIFY(col type) → recreate workaround ──
+  const modifyM = s.match(/^ALTER\s+TABLE\s+(\w+)\s+MODIFY\s*\(?(.+?)\)?\s*$/i);
+  if(modifyM){
+    // SQLite doesn't support MODIFY — inform user with helpful message
+    print(`NOTE: SQLite does not support ALTER TABLE MODIFY directly.`,'warn');
+    print(`Workaround: CREATE new table, copy data, DROP old, RENAME new.`,'muted');
+    blank();
+    return ''; // skip execution
+  }
+
+  // ── ALTER TABLE t DROP COLUMN col (SQLite 3.35+ only) ──
+  // Already supported — pass through
+
+  // ── Oracle DATE literals: TO_DATE('...','...') → just the string ──
+  let out = s.replace(/TO_DATE\s*\(\s*'([^']+)'\s*,\s*'[^']+'\s*\)/gi, "'$1'");
+
+  // ── Oracle NUMBER(p,s) → REAL, NUMBER(p) → INTEGER ──
+  out = out.replace(/\bNUMBER\s*\(\s*\d+\s*,\s*\d+\s*\)/gi, 'REAL');
+  out = out.replace(/\bNUMBER\s*\(\s*\d+\s*\)/gi, 'INTEGER');
+  out = out.replace(/\bNUMBER\b/gi, 'REAL');
+
+  // ── Oracle VARCHAR2 → TEXT ──
+  out = out.replace(/\bVARCHAR2\s*\(\s*\d+\s*\)/gi, 'TEXT');
+  out = out.replace(/\bVARCHAR2\b/gi, 'TEXT');
+
+  // ── Oracle CLOB/BLOB/NVARCHAR2/NCHAR → TEXT ──
+  out = out.replace(/\b(?:CLOB|NCLOB|NVARCHAR2|NCHAR)\b/gi, 'TEXT');
+
+  // ── SYSDATE → datetime('now') ──
+  out = out.replace(/\bSYSDATE\b/gi, "datetime('now')");
+
+  // ── NVL(a,b) → COALESCE(a,b) ──
+  out = out.replace(/\bNVL\s*\(/gi, 'COALESCE(');
+
+  // ── DECODE(col,v1,r1,v2,r2,def) → CASE WHEN ──
+  // (basic single-value decode)
+  out = out.replace(/\bDECODE\s*\(([^)]+)\)/gi, (match, inner) => {
+    const parts = inner.split(',').map(p=>p.trim());
+    if(parts.length < 3) return match;
+    const col = parts[0];
+    let caseExpr = 'CASE';
+    for(let i=1; i<parts.length-1; i+=2){
+      caseExpr += ` WHEN ${col} = ${parts[i]} THEN ${parts[i+1]}`;
+    }
+    if(parts.length % 2 === 0){
+      caseExpr += ` ELSE ${parts[parts.length-1]}`;
+    }
+    caseExpr += ' END';
+    return caseExpr;
+  });
+
+  // ── ROWNUM → rowid (approximate) ──
+  out = out.replace(/\bROWNUM\b/gi, 'rowid');
+
+  // ── Oracle SEQUENCE.NEXTVAL → not supported, warn ──
+  if(/\.\s*NEXTVAL\b/i.test(out)){
+    print(`NOTE: SEQUENCE.NEXTVAL not supported. Use AUTOINCREMENT instead.`,'warn');
+  }
+
+  return out;
+}
+
+// Helper: split column definitions respecting parentheses
+// e.g. "hiredate DATE, name VARCHAR(50), sal NUMBER(10,2)"
+// → ["hiredate DATE", "name VARCHAR(50)", "sal NUMBER(10,2)"]
+function splitColDefs(str){
+  const cols=[], s=str.trim();
+  let cur='', depth=0;
+  for(let i=0;i<s.length;i++){
+    const c=s[i];
+    if(c==='(') depth++;
+    else if(c===')') depth--;
+    else if(c===','&&depth===0){
+      if(cur.trim()) cols.push(cur.trim());
+      cur=''; continue;
+    }
+    cur+=c;
+  }
+  if(cur.trim()) cols.push(cur.trim());
+  return cols;
+}
+
+function describeTable(name){
+  try{
+    const r=db.exec(`PRAGMA table_info(${name})`);
+    if(!r.length||!r[0].values.length){print(`ERROR 1146 (42S02): Table '${currentDb}.${name}' doesn't exist`,'err');}
+    else{
+      const rows=r[0].values.map(v=>[v[1],v[2],v[3]?'NO':'YES',v[5]?'PRI':'',v[4]??'NULL',v[5]?'auto_increment':'']);
+      renderTable(['Field','Type','Null','Key','Default','Extra'],rows,'0.00');
+    }
+  }catch(e){print('ERROR: '+e.message,'err');}
+  blank();
+}
+
+function splitSQL(sql){
+  // Splits on ; but respects string literals AND parenthesis depth
+  // so subqueries like WHERE x>(SELECT ...) are never broken
+  const stmts=[];
+  let cur='', inStr=false, sc='', depth=0;
+  for(let i=0;i<sql.length;i++){
+    const c=sql[i];
+    if(inStr){
+      cur+=c;
+      if(c===sc){
+        // handle escaped '' inside strings
+        if(sc==="'" && sql[i+1]==="'"){ cur+=sql[++i]; }
+        else { inStr=false; }
+      }
+    } else if(c==="'"||c==='"'||c==='`'){
+      inStr=true; sc=c; cur+=c;
+    } else if(c==='('){
+      depth++; cur+=c;
+    } else if(c===')'){
+      if(depth>0) depth--;
+      cur+=c;
+    } else if(c===';' && depth===0){
+      if(cur.trim()) stmts.push(cur.trim());
+      cur='';
+    } else {
+      cur+=c;
+    }
+  }
+  if(cur.trim()) stmts.push(cur.trim());
+  return stmts;
+}
+
+function doStatus(){
+  print('--------------','muted');
+  print('VISMAY DBMS  Ver 8.0.35 (SQLite/IndexedDB)','ok');
+  print('','muted');
+  print(`Current database: ${currentDb}`,'info');
+  print('Current user:     root@localhost','muted');
+  print('Storage:          IndexedDB (permanent)','muted');
+  print('Author:           Vismay','warn');
+  print('Platform:         '+(isDesktop?'Desktop':'Mobile/iOS'),'muted');
+  print('--------------','muted');
+  blank();
+}
+
+function doHelp(){
+  pH(`<div style="color:var(--t2);line-height:2;font-family:'JetBrains Mono',monospace;font-size:13px">
+<span style="color:var(--orange);font-weight:700;font-size:14px">VISMAY DBMS — Help</span>
+
+<span style="color:var(--yellow)">Database:</span>
+  CREATE DATABASE name   DROP DATABASE name
+  USE name               SHOW DATABASES
+
+<span style="color:var(--yellow)">Tables:</span>
+  CREATE TABLE ...       DROP TABLE name
+  SHOW TABLES            DESCRIBE name
+  ALTER TABLE ...        TRUNCATE name
+
+<span style="color:var(--yellow)">Data:</span>
+  SELECT ... FROM ...    INSERT INTO ...
+  UPDATE ...             DELETE FROM ...
+  JOIN · WHERE · GROUP BY · ORDER BY · LIMIT
+
+<span style="color:var(--yellow)">PL/SQL:</span>
+  DECLARE                   — declare variables
+    v_name VARCHAR2(50);
+    v_age  NUMBER := 0;
+  BEGIN                     — start block
+    DBMS_OUTPUT.PUT_LINE('Hello ' || v_name);
+    IF v_age &gt; 18 THEN ... END IF;
+    FOR i IN 1..10 LOOP ... END LOOP;
+    WHILE cond LOOP ... END LOOP;
+    SELECT col INTO v_name FROM t WHERE ...;
+  EXCEPTION
+    WHEN OTHERS THEN ...
+  END;
+
+  CREATE OR REPLACE PROCEDURE name(p IN type) AS
+    BEGIN ... END;
+  EXEC name(value);
+
+  CREATE OR REPLACE FUNCTION name RETURN type AS
+    BEGIN ... RETURN val; END;
+
+<span style="color:var(--yellow)">iOS Tips:</span>
+  • Use the <span style="color:var(--cyan)">keyword toolbar</span> for quick SQL/PL/SQL
+  • Tap <span style="color:var(--green)">↵</span> or end with <span style="color:var(--green)">;</span> to run
+  • PL/SQL blocks: type END; on last line to execute
+  • <span style="color:var(--green)">\\c</span> — cancel  •  <span style="color:var(--green)">help;</span> — this help
+</div>`);
+  blank();
+}
+function runHelp(){doHelp();}
+
+// ═══════════════════════════════════════════════════
+//  KEYBOARD — desktop support (history, Tab)
+// ═══════════════════════════════════════════════════
+cmdInput.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!e.shiftKey){
+    e.preventDefault();
+    submitCurrentInput(); return;
+  }
+  if(e.key==='ArrowUp'&&!multilineBuffer){
+    e.preventDefault();
+    if(histIdx>0){histIdx--;cmdInput.value=cmdHistory[histIdx]||'';resizeInput();} return;
+  }
+  if(e.key==='ArrowDown'&&!multilineBuffer){
+    e.preventDefault();
+    if(histIdx<cmdHistory.length-1){histIdx++;cmdInput.value=cmdHistory[histIdx]||'';}
+    else{histIdx=cmdHistory.length;cmdInput.value='';}
+    resizeInput(); return;
+  }
+  if(e.key==='Tab'){
+    e.preventDefault();
+    const KW=['SELECT','FROM','WHERE','JOIN','INNER JOIN','LEFT JOIN','INSERT INTO','VALUES',
+      'UPDATE','SET','DELETE FROM','CREATE TABLE','DROP TABLE','CREATE DATABASE','DROP DATABASE',
+      'USE','DESCRIBE','SHOW TABLES','SHOW DATABASES','GROUP BY','ORDER BY','HAVING','LIMIT',
+      'DISTINCT','AND','OR','NOT','IN','BETWEEN','LIKE','IS NULL','COUNT','SUM','AVG','MIN','MAX',
+      'PRIMARY KEY','NOT NULL','DEFAULT','AUTOINCREMENT','INDEX','BEGIN','COMMIT','ROLLBACK'];
+    const val=cmdInput.value;const words=val.split(/\s+/);const last=words[words.length-1].toUpperCase();
+    if(last){const m=KW.filter(k=>k.startsWith(last)&&k!==last);if(m.length===1){words[words.length-1]=m[0];cmdInput.value=words.join(' ')+' ';resizeInput();}}
+    return;
+  }
+});
+
+cmdInput.addEventListener('input',resizeInput);
+function resizeInput(){
+  cmdInput.style.height='auto';
+  cmdInput.style.height=Math.min(cmdInput.scrollHeight,120)+'px';
+}
+
+// Ctrl+L clear
+document.addEventListener('keydown',e=>{
+  if(e.ctrlKey&&e.key==='l'){e.preventDefault();termOut.innerHTML='';blank();}
+});
+
+// Tap terminal → focus input
+document.getElementById('term-wrap').addEventListener('click',e=>{
+  if(!window.getSelection().toString()&&e.target.id!=='term-out'&&!e.target.closest('.tbox'))
+    cmdInput.focus();
+});
+
+// ═══════════════════════════════════════════════════
+//  QUICK (sidebar)
+// ═══════════════════════════════════════════════════
+function quickAndClose(sql){
+  closeSidebar();
+  setTimeout(()=>{
+    multilineBuffer=''; updatePrompt();
+    echoCmd([sql]);
+    executeSQL(sql.trim().replace(/;+$/,''));
+  },isDesktop?0:250);
+}
+
+// ═══════════════════════════════════════════════════
+//  EXPORT — full backup as .vdbms file (binary) + SQL
+// ═══════════════════════════════════════════════════
+async function exportSQL(){
+  if(!db)return;
+
+  // Ask what to export
+  const choice = await showExportDialog();
+  if(!choice) return;
+
+  if(choice==='all'){
+    // Export ALL databases as a single .vdbms backup file
+    const dbs = await listDatabases();
+    const backup = { version:2, exported: new Date().toISOString(), databases:{} };
+    for(const name of dbs){
+      const data = await idbGet('db:'+name);
+      if(data){
+        // Convert Uint8Array to base64 for JSON storage
+        backup.databases[name] = btoa(String.fromCharCode(...data));
+      }
+    }
+    const json = JSON.stringify(backup);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([json],{type:'application/json'}));
+    a.download = `vismay_backup_${Date.now()}.vdbms`;
+    a.click();
+    print(`-- ✅ Full backup exported: ${dbs.length} database(s) saved to .vdbms file`,'ok');
+    print(`-- 💡 To restore: click ⬇ Export → Import Backup → select the .vdbms file`,'muted');
+    blank();
+    return;
+  }
+
+  if(choice==='sql'){
+    // Export current DB as .sql dump
+    let dump=`-- VISMAY DBMS SQL Dump\n-- Database: ${currentDb}\n-- Exported: ${new Date().toISOString()}\n-- Import this file using: ⬇ Export → Import SQL\n\n`;
+    try{
+      const tables=db.exec("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name");
+      if(tables.length){tables[0].values.forEach(([t])=>{
+        const cr=db.exec(`SELECT sql FROM sqlite_master WHERE type='table' AND name='${t}'`);
+        if(cr.length)dump+=cr[0].values[0][0]+';\n\n';
+        const rows=db.exec(`SELECT * FROM \`${t}\``);
+        if(rows.length&&rows[0].values.length){
+          const cols=rows[0].columns.join(', ');
+          rows[0].values.forEach(r=>{dump+=`INSERT INTO \`${t}\` (${cols}) VALUES (${r.map(v=>v===null?'NULL':`'${String(v).replace(/'/g,"''")}'`).join(', ')});\n`;});
+          dump+='\n';
+        }
+      });}
+    }catch(e){print('Export error: '+e.message,'err');return;}
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([dump],{type:'text/plain'}));
+    a.download=`${currentDb}_dump.sql`;a.click();
+    print(`-- ✅ SQL dump exported: ${currentDb}_dump.sql`,'ok');blank();
+    return;
+  }
+
+  if(choice==='import_backup'){
+    importBackup();
+    return;
+  }
+
+  if(choice==='import_sql'){
+    importSQL();
+    return;
+  }
+}
+
+function showExportDialog(){
+  return new Promise(resolve=>{
+    // Remove any existing dialog
+    document.getElementById('export-dialog')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id='export-dialog';
+    overlay.style.cssText=`position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;display:flex;align-items:center;justify-content:center;`;
+
+    overlay.innerHTML=`
+      <div style="background:#1c2128;border:1px solid #444c56;border-radius:12px;padding:24px;min-width:300px;max-width:90vw;font-family:'JetBrains Mono',monospace;">
+        <div style="color:#e8812d;font-weight:700;font-size:15px;margin-bottom:16px;">⬇ Export / Import</div>
+        <div id="ed-btn" data-v="all"    style="padding:11px 14px;border:1px solid #30363d;border-radius:8px;margin-bottom:8px;cursor:pointer;color:#3fb950;">💾 Backup ALL databases (.vdbms)</div>
+        <div id="ed-btn" data-v="sql"    style="padding:11px 14px;border:1px solid #30363d;border-radius:8px;margin-bottom:8px;cursor:pointer;color:#58d8ff;">📄 Export current DB as SQL (.sql)</div>
+        <div id="ed-btn" data-v="import_backup" style="padding:11px 14px;border:1px solid #30363d;border-radius:8px;margin-bottom:8px;cursor:pointer;color:#e3b341;">📂 Import Backup (.vdbms) — restore all databases</div>
+        <div id="ed-btn" data-v="import_sql"    style="padding:11px 14px;border:1px solid #30363d;border-radius:8px;margin-bottom:8px;cursor:pointer;color:#e3b341;">📂 Import SQL (.sql) — run into current database</div>
+        <div id="ed-btn" data-v="cancel" style="padding:11px 14px;border:1px solid #30363d;border-radius:8px;cursor:pointer;color:#484f58;">✕ Cancel</div>
+      </div>`;
+
+    overlay.querySelectorAll('[id=ed-btn]').forEach(btn=>{
+      btn.addEventListener('mouseover',()=>btn.style.background='rgba(255,255,255,.05)');
+      btn.addEventListener('mouseout', ()=>btn.style.background='');
+      btn.addEventListener('click',()=>{
+        overlay.remove();
+        const v=btn.dataset.v;
+        resolve(v==='cancel'?null:v);
+      });
+    });
+    overlay.addEventListener('click',e=>{if(e.target===overlay){overlay.remove();resolve(null);}});
+    document.body.appendChild(overlay);
+  });
+}
+
+// ── Import .vdbms backup file ─────────────────────
+function importBackup(){
+  const input=document.createElement('input');
+  input.type='file'; input.accept='.vdbms,.json';
+  input.onchange=async e=>{
+    const file=e.target.files[0]; if(!file)return;
+    try{
+      const text=await file.text();
+      const backup=JSON.parse(text);
+      if(!backup.databases||backup.version<1){
+        print('ERROR: Invalid backup file format','err'); blank(); return;
+      }
+      let count=0;
+      for(const [name, b64] of Object.entries(backup.databases)){
+        // Convert base64 back to Uint8Array
+        const binary=atob(b64);
+        const arr=new Uint8Array(binary.length);
+        for(let i=0;i<binary.length;i++) arr[i]=binary.charCodeAt(i);
+        await idbPut('db:'+name, arr);
+        count++;
+      }
+      print(`-- ✅ Restored ${count} database(s) from backup: ${Object.keys(backup.databases).join(', ')}`,'ok');
+      print(`-- Exported on: ${backup.exported||'unknown'}`,'muted');
+      blank();
+      refreshSidebar();
+      // Switch to first restored db
+      const firstName=Object.keys(backup.databases)[0];
+      if(firstName){ await switchDb(firstName); print(`-- Now using: ${firstName}`,'muted'); blank(); }
+    }catch(err){
+      print('ERROR: Could not read backup — '+err.message,'err'); blank();
+    }
+  };
+  input.click();
+}
+
+// ── Import .sql file into current database ────────
+function importSQL(){
+  const input=document.createElement('input');
+  input.type='file'; input.accept='.sql,.txt';
+  input.onchange=async e=>{
+    const file=e.target.files[0]; if(!file)return;
+    try{
+      const text=await file.text();
+      print(`-- Importing SQL from: ${file.name}`,'muted');
+      const stmts=splitSQL(text).filter(s=>s.trim()&&!s.trim().startsWith('--'));
+      let ok=0, fail=0;
+      stmts.forEach(stmt=>{
+        stmt=translateOracleSQL(stmt);
+        if(Array.isArray(stmt)) stmt.forEach(s=>runOneStmt(s));
+        else runOneStmt(stmt);
+      });
+      function runOneStmt(s){
+        s=s.trim(); if(!s)return;
+        try{ db.exec(s); ok++; }catch(err){ fail++; print(`WARN: ${err.message}`,'warn'); }
+      }
+      print(`-- ✅ Import complete: ${ok} statement(s) OK, ${fail} failed`,'ok');
+      blank();
+      refreshSidebar();
+      schedSave();
+    }catch(err){
+      print('ERROR: Could not read SQL file — '+err.message,'err'); blank();
+    }
+  };
+  input.click();
+}
+
+// ═══════════════════════════════════════════════════
+//  RESET
+// ═══════════════════════════════════════════════════
+async function resetDb(){
+  if(!confirm('⚠️ Delete ALL databases and data permanently?'))return;
+  const dbs=await listDatabases();
+  for(const n of dbs)await idbDel('db:'+n);
+  print('-- All data wiped. Reloading…','warn');
+  setTimeout(()=>location.reload(),1200);
+}
+
+// ═══════════════════════════════════════════════════
+//  MIGRATE from old IDB versions
+//  Checks vismay_dbms (v1) and vismay_dbms2 (v2)
+//  and copies any data into current IDB_NAME store
+// ═══════════════════════════════════════════════════
+async function migrateOldData(){
+  const oldNames=['vismay_dbms','mysql_terminal'];
+  for(const oldName of oldNames){
+    try{
+      const data = await new Promise((res,rej)=>{
+        const r=indexedDB.open(oldName,1);
+        r.onupgradeneeded=()=>res(null); // didn't exist
+        r.onerror=()=>res(null);
+        r.onsuccess=e=>{
+          const oldDb=e.target.result;
+          const stores=[...oldDb.objectStoreNames];
+          if(!stores.length){oldDb.close();res(null);return;}
+          const store=stores[0];
+          const tx=oldDb.transaction(store,'readonly');
+          const req=tx.objectStore(store).getAll();
+          req.onsuccess=ev=>{
+            oldDb.close();
+            res({keys:null,values:ev.target.result,storeName:store,dbObj:oldDb});
+          };
+          req.onerror=()=>{oldDb.close();res(null);};
+        };
+      });
+
+      if(!data||!data.values||!data.values.length) continue;
+
+      // Also get keys
+      const keysData = await new Promise(res=>{
+        const r=indexedDB.open(oldName,1);
+        r.onsuccess=e=>{
+          const oldDb=e.target.result;
+          if(![...oldDb.objectStoreNames].includes(data.storeName)){oldDb.close();res([]);return;}
+          const tx=oldDb.transaction(data.storeName,'readonly');
+          const req=tx.objectStore(data.storeName).getAllKeys();
+          req.onsuccess=ev=>{oldDb.close();res(ev.target.result||[]);};
+          req.onerror=()=>{oldDb.close();res([]);};
+        };
+        r.onerror=()=>res([]);
+      });
+
+      // Copy each key/value into current IDB
+      let migrated=0;
+      for(let i=0;i<keysData.length;i++){
+        const key=keysData[i];
+        const val=data.values[i];
+        if(!val) continue;
+        // Map old key formats to new 'db:name' format
+        let newKey;
+        if(typeof key==='string'&&key.startsWith('db:')) newKey=key;
+        else if(key==='mydb'||key==='database') newKey='db:default';
+        else newKey='db:'+key;
+
+        const existing=await idbGet(newKey);
+        if(!existing){
+          await idbPut(newKey,val);
+          migrated++;
+        }
+      }
+      if(migrated>0){
+        return migrated; // signal that migration happened
+      }
+    }catch(e){
+      // Old DB doesn't exist or can't be read — that's fine
+    }
+  }
+  return 0;
+}
+
+// ═══════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════
+async function init(){
+  await openIDB();
+  SQL=await initSqlJs({locateFile:f=>`https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/${f}`});
+
+  // Migrate old data from previous versions silently
+  const migrated = await migrateOldData();
+
+  const dbs=await listDatabases();
+  currentDb=dbs[0]||'default';
+  const saved=await idbGet('db:'+currentDb);
+  db=saved?new SQL.Database(saved):new SQL.Database();
+  if(!saved){await idbPut('db:'+currentDb,db.export());}
+
+  pH(`<div class="welcome">
+<span class="logo">VISMAY DBMS</span>
+
+Welcome to the VISMAY DBMS monitor. Commands end with <span class="info">;</span>
+Data is saved <span class="ok">permanently</span> on this device.
+Server version: 8.0.35 &nbsp;&nbsp; Author: <span style="color:var(--orange);font-weight:700">Vismay</span>
+
+Type <span class="info">help;</span> for help. Use the keyword bar above the keyboard for quick SQL.
+</div>`);
+
+  if(migrated>0){
+    print(`-- ✅ Migrated ${migrated} database(s) from previous version automatically!`,'ok');
+  }
+
+  if(!saved&&!migrated){
+    print(`-- Fresh database '${currentDb}' ready.`,'muted');
+    print(`-- Try: CREATE DATABASE mydb;  then  USE mydb;`,'muted');
+  }else{
+    const cnt=db.exec("SELECT COUNT(*) FROM sqlite_master WHERE type='table'")[0]?.values[0]?.[0]??0;
+    print(`-- ✅ Restored '${currentDb}' (${cnt} table${cnt!==1?'s':''}).`,'muted');
+  }
+  print(`-- 💡 Tip: Use ⬇ Export → Backup ALL databases to save a .vdbms file anytime.`,'muted');
+  blank();
+
+  updatePrompt();
+  updateSidebarInfo();
+  refreshSidebar();
+
+  if(isDesktop) cmdInput.focus();
+
+  window.addEventListener('beforeunload',()=>{if(db){idbPut('db:'+currentDb,db.export());}});
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden&&db){idbPut('db:'+currentDb,db.export());}
+  });
+}
+
+init().catch(e=>{
+  termOut.innerHTML=`<div class="ol err">Init failed: ${esc(e.message)}</div>`;
+});
+</script>
+</body>
+</html>
